@@ -21,17 +21,18 @@ printout:
 .loop:
     lodsb          ; loads a byte from the ds:si into the al register and then increments si
     or al, al      ; the or instruction performs a bitwise or, and stores the result on the left side, verify if the next character is null
-    ; the above line will also modify the flag register
-    jz .done ; Jumps to the done label if the 0 flag is set
+    ; the above line will also modify the flag register, if al is 0(end of the string), the zero flag is set
+    jz .done ; Jumps to the done label if the zero flag is set 
     
-    mov ah, 0x0e
-    mov bh, 0
-    int 0x10
+    mov ah, 0x0e ; 0x0e is the teletype output service of the BIOS Interupt 0x10 
+    mov bh, 0 ; sets the page number to 0
+    int 0x10 ; This calls the BIOS interupt 0x10 which uses AH to determine the function (in this case, it's teletype output) and al as the data input (in this case, it's the character of the string)
     
     jmp .loop
 
 .done:
-    pop ax
+    ; pop restores the original value of AX and SI registers from the stack x
+    pop ax 
     pop si
     ret
 
@@ -48,16 +49,40 @@ main:
     mov sp, 0x7C00 ; stack grows downward, and we set it up in such a way that it points towards the start of our Operating System
 
     ; printing the message 
-    mov si, msg_hello
+    mov si, msg_1
     call printout
 
+    mov si, msg_2
+    call printout
+
+    mov si, msg_3
+    call printout
+
+    mov si, msg_4
+    call printout
+
+    mov si, msg_5
+    call printout
+    
+    mov si, msg_6
+    call printout
+
+    mov si, msg_7
+    call printout
 
     hlt
 
 .halt:
     jmp .halt
 
-msg_hello: db 'Hello world!', ENDL, 0
+msg_1: db ' ___      __   __  __   __  _______    _______  _______ ', ENDL, 0
+msg_2: db '|   |    |  | |  ||  |_|  ||   _   |  |       ||       |', ENDL, 0
+msg_3: db '|   |    |  | |  ||       ||  |_|  |  |   _   ||  _____|', ENDL, 0
+msg_4: db '|   |    |  |_|  ||       ||       |  |  | |  || |_____ ', ENDL, 0
+msg_5: db '|   |___ |       ||       ||       |  |  |_|  ||_____  |', ENDL, 0
+msg_6: db '|       ||       || ||_|| ||   _   |  |       | _____| |', ENDL, 0
+msg_7: db '|_______||_______||_|   |_||__| |__|  |_______||_______|', ENDL, 0
+
 
 times 510-($-$$) db 0 ; Pad with zeroes to occupy 510 bytes 
 dw 0AA55h ; Adding the 2 byte Boot Signature at the end
