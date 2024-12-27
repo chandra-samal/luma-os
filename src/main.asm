@@ -84,5 +84,9 @@ msg_6: db '|       ||       || ||_|| ||   _   |  |       | _____| |', ENDL, 0
 msg_7: db '|_______||_______||_|   |_||__| |__|  |_______||_______|', ENDL, 0
 
 
-times 510-($-$$) db 0 ; Pad with zeroes to occupy 510 bytes 
+times 510-($-$$) db 0 
+; `$` represents the current position in the code
+; `$$` represents the start of the section (in this case, it represents org)
+; `$-$$` calculates the size of the code so far
+; `510-($-$$)` calculates how much padding is needed to make the size exactly 510 bytes
 dw 0AA55h ; Adding the 2 byte Boot Signature at the end
