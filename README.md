@@ -5,6 +5,10 @@ This Operating System is based on x86 Architechture, and assembly code is writte
 
 This OS has been designed to be Legacy Booted.
 
+**DEPENDENCIES**:
+- Having the basic knowledge of make (Makefile)
+- Having the basic knowledge of NASM, and x86 assembly language 
+
 *Legacy Booting*
 
 - BIOS loads first sector of memory from each bootable device into memory (always at the location 0x7C00, it has also been the industry standard to store the memory at that location.)
