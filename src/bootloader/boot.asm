@@ -83,16 +83,153 @@ main:
     mov ss, ax
     mov sp, 0x7C00 ; stack grows downward, and we set it up in such a way that it points towards the start of our Operating System
 
-    ; printing the message 
-    mov si, msg_1
-    call printout
+    ; read something from floppy disk
+    ; BIOS should DL to drive number
+    mov [ebr_drive_number], dl
 
+    mov ax, 1                       ; LBA=1, second sector from the disk
+    mov cl, 1                       ; 1 sector to read
+    mov bx, 0x7E00                  ; data should be after the bootloader
+    call disk_read
+
+
+    ; printing the message 
+    mov si, msg_welcome
+    call printout
+    cli
     hlt
 
-.halt:
-    jmp .halt
+floppy_error:
+    mov si, msg_read_failed
+    call printout
+    jmp wait_key_and_reboot
+    hlt
 
-msg_1: db 'Welcome to Luma-OS', ENDL, 0
+wait_key_and_reboot:
+    mov ah, 0
+    int 16h                     ; wait for a keypress
+    jmp 0FFFFh:0                ; jumps to beginning of BIOS, should reboot the system
+
+.halt:
+    cli                         ; disable interrupts, this way CPU won't be able to get out of the "halt" state
+    hlt
+
+
+;
+; Disk routines 
+;
+
+
+;
+; will convert an LBA address to a CHS address
+; Params:
+;   - ax, it will contain the LBA address
+; Returns:
+;   - cx [bits 0-5]: sector number
+;   - cx [bits 6-15]: cylinder
+;   - dh: head 
+;
+
+;
+; NOTE : Remainder and Quotients are stored in registers according to the mode, we are operating in 16-bit mode
+; In 16-bit mode:
+; The quotient is stored in ax register
+; The remainder is stored in dx register
+;
+
+lba_to_chs:
+    push ax
+    push dx
+
+
+    xor dx, dx                                          ; dx =  0
+    div word [bdb_sectors_per_track]                    ; ax = LBA / SectorsPerTrack
+                                                        ; dx = LBA % SectorsPerTrack
+
+    inc dx                                              ; dx = (LBA % SectorsPerTrack + 1) = sector
+    mov cx, dx                                          ; cx = sector   
+
+    xor dx, dx                                          ; dx = 0
+    div word [bdb_heads]                                ; ax = (LBA / SectorsPerTrack) / Heads = cylinder number
+                                                        ; dx = (LBA / SectorsPerTrack) % Heads = head number
+
+    ; The lower byte of dx(dl) stores the head number because it is small enough to fit in one byte (0-255)
+    mov dh, dl                                          ; dh = head number 
+    mov ch, al                                          ; ch = cylinder (lower 8 bits)
+    shl ah, 6                       
+    or cl, ah                                           ; put upper 2 bits of cylinder in CL
+
+    pop ax
+    mov dl, al                                          ; restores DL
+    pop ax
+    ret
+
+;
+; Reads sectors from a disk 
+; Parameters:
+;       - ax = LBA
+;       - cl = number of sectors to read (up to 128)
+;       - dl = drive number
+;       - es:bx = memory address where to store read data
+;
+
+disk_read:
+    push ax                             ; saving the registers that we are going to modify
+    push bx
+    push cx
+    push dx
+    push di
+
+    push cx                             ; temporarily saves CL(numbers of sectors to read) in the stack
+    call lba_to_chs                     ; compute CHS and stores it in CX, and DH
+    pop ax                              ; AL = number of sectors
+    mov ah, 02h
+    mov di, 3
+
+.retry:
+    pusha                               ; Saves all the registers, as we are unaware of what the BIOS will modify
+    stc                                 ; sets carry flag
+    int 13h                             ; carry flag cleared = success = jump out of the loop
+    jnc .done                           
+
+    ; failed
+    popa
+    call disk_reset
+
+    dec di
+    test di, di
+    jnz .retry
+
+.fail:
+    ; after all attempts have been exhausted 
+    jmp floppy_error
+
+.done:
+    popa
+
+    pop di
+    pop dx
+    pop cx
+    pop bx
+    pop ax                             ; restore registers modified 
+    ret
+
+;
+; Resets Disk Controller
+; Parameters:
+;   dl = drive number
+;
+disk_reset:
+    pusha
+    mov ah, 0
+    stc
+    int 13h
+    jc floppy_error
+    popa
+    ret
+
+msg_welcome: db 'Welcome to Luma-OS', ENDL, 0
+msg_read_failed: db 'Unable to read from the disk!', ENDL, 0
 
 
 times 510-($-$$) db 0 
